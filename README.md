@@ -20,7 +20,7 @@
 
 -	Antes de mais nada, **clone o repositorio** com:
 ```
-git clone https://github.com/dhhruv/Chrome-Dino-Runner.git
+git clone https://github.com/inteligenciamilgrau/dinossauro_chrome_chatgpt.git
 ``` 
 **OU**
 Faça o Download do ZIP e descompacte seu conteudo.
