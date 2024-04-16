@@ -9,7 +9,7 @@
 
 ### Sobre:
 
--	A seguir, representamos uma versão recriada para LLM jogar do famoso Dinosaur Game no modo off-line do navegador Chrome, implementado usando **Python e PyGame**. A adaptção foi feita por Dhruv Panchal e pode ser baixada no (https://github.com/dhhruv/Chrome-Dino-Runner)[https://github.com/dhhruv/Chrome-Dino-Runner]. O arquivo do projeto contém **Arquivos de imagem** e um script python **(chromedino_V1_GPT4.py)**.
+-	A seguir, representamos uma versão recriada para LLM jogar do famoso Dinosaur Game no modo off-line do navegador Chrome, implementado usando **Python e PyGame**. A adaptção foi feita por Dhruv Panchal e pode ser baixada no https://github.com/dhhruv/Chrome-Dino-Runner. O arquivo do projeto contém **Arquivos de imagem** e um script python **(chromedino_V1_GPT4.py)**.
 -	Uma GUI simples e fácil de usar é fornecida para uma melhor jogabilidade. O design da jogabilidade é tão simples que o usuário não achará difícil de usar e entender. Diferentes imagens são usadas no desenvolvimento deste projeto de jogo simples, o ambiente de jogo é igual ao jogo Chrome Dino Run original. Para demonstração do projeto, dê uma olhada no GIF abaixo.
 
 <p align="center">
