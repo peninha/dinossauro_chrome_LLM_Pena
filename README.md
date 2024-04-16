@@ -34,7 +34,7 @@ pip install requirements.txt
 
 -	Depois da instalação, configure sua API da OpenAI na pasta ".env", e rode o [`chromedino_V1_GPT4.py`] com
 ```
-python chromedino.py
+python chromedino_V1_GPT4.py
 ```
 
 ### Importante:
