@@ -12,15 +12,20 @@ import pygame
 from openai import OpenAI
 import google.generativeai as genai
 import requests
+import anthropic
 
 #modelo = "gpt-3.5-turbo-0125"
-#modelo = "gpt-4-1106-preview"
 modelo = "gpt-4o"
+
 #modelo = "gemini-1.0-pro-latest"
 
 #modelo = "llama3"  # ollama
-modelo = "phi3"  # ollama
+#modelo = "phi3"  # ollama
 url_ollama = "http://localhost:11434/api/generate"  # endereco do ollama
+
+#modelo = "claude-3-haiku-20240307"
+#modelo = "claude-3-sonnet-20240229"
+# modelo = "claude-3-opus-20240229"
 
 dados = {'inimigo': 'indefinida', 'distancia': "indefinida", 'altura': 'indefinida'}
 acao = {"acao": "nenhuma"}
@@ -465,7 +470,10 @@ elif modelo.startswith("gemini"):
         if 'generateContent' in m.supported_generation_methods:
             print(m.name)
     client = genai.GenerativeModel(modelo)
-
+elif modelo.startswith("claude"):
+    client = anthropic.Anthropic(
+        api_key=os.environ.get("ANTHROPIC_API_KEY"),
+    )
 
 def generate_answer(messages, model="gpt-3.5-turbo-1106"):
     print("Modelo", model)
@@ -489,6 +497,22 @@ def generate_answer(messages, model="gpt-3.5-turbo-1106"):
             genai.GenerationConfig(response_mime_type="application/json", temperature=temperatura)
             response = client.generate_content(messages)
             return response.text.lower().replace("```", "").replace("json","")
+        except Exception as e:
+            print("Erro Gemini", e)
+            return e
+    elif model.startswith("claude"):
+        try:
+            msg = client.messages.create(
+
+                model=model,
+                max_tokens=1000,
+                temperature=temperatura,
+                #system="Você é um assistente divertido.",
+                messages=[
+                    {"role": "user", "content": messages}
+                ]
+            )
+            return msg.content[0].dict()['text']
         except Exception as e:
             print("Erro Gemini", e)
             return e
