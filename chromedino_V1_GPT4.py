@@ -273,12 +273,12 @@ def main():
                 f.write("Initial content if needed\n")
         with open(file_path, "r") as f:
             score_ints = [int(x) for x in f.read().split()]
-            print("score_ints", score_ints)
+            #print("score_ints", score_ints)
             if score_ints:
                 highscore = max(score_ints)
             else:
                 highscore = 0
-            print("SCORE", highscore, points)
+            #print("SCORE", highscore, points)
             if points > highscore:
                 highscore=points 
             text = font.render("High Score: "+ str(highscore) + "  Points: " + str(points), True, FONT_COLOR)
