@@ -10,10 +10,12 @@ from dotenv import load_dotenv
 load_dotenv()
 import pygame
 from openai import OpenAI
+import google.generativeai as genai
 
 #modelo = "gpt-3.5-turbo-0125"
 #modelo = "gpt-4-1106-preview"
 modelo = "gpt-4o"
+#modelo = "gemini-1.0-pro-latest"
 
 dados = {'inimigo': 'indefinida', 'distancia': "indefinida", 'altura': 'indefinida'}
 acao = {"acao": "nenhuma"}
@@ -23,7 +25,8 @@ inicia_bot = True
 
 def atualiza(dados):
     global jogar
-    jogar = f"""Você é um dinossauro e está em uma aventura. Você tem a altura de <sua altura>120</sua altura>.
+    jogar = f"""Você é um dinossauro e está em uma aventura.
+    Você tem a altura de <sua altura>120</sua altura>.
     Você vai receber dados sobre o ambiente e precisa tomar uma decisão.
     No ambiente há dois inimigos: cactus e birds.
 
@@ -269,8 +272,13 @@ def main():
                 # Write some initial content to the file
                 f.write("Initial content if needed\n")
         with open(file_path, "r") as f:
-            score_ints = [int(x) for x in f.read().split()]  
-            highscore = max(score_ints)
+            score_ints = [int(x) for x in f.read().split()]
+            print("score_ints", score_ints)
+            if score_ints:
+                highscore = max(score_ints)
+            else:
+                highscore = 0
+            print("SCORE", highscore, points)
             if points > highscore:
                 highscore=points 
             text = font.render("High Score: "+ str(highscore) + "  Points: " + str(points), True, FONT_COLOR)
@@ -370,6 +378,8 @@ def menu(death_count):
     global FONT_COLOR
     global run_agent, dados
 
+    last_score = 0
+
     run = True
     while run:
         current_time = datetime.datetime.now().hour
@@ -386,13 +396,16 @@ def menu(death_count):
         elif death_count > 0:
             dados = {'inimigo': 'indefinida', 'distancia': "indefinida", 'altura': 'indefinida'}
             text = font.render("Press any Key to Restart", True, FONT_COLOR)
-            score = font.render("Your Score: " + str(points), True, FONT_COLOR)
+            score = font.render("Your Score: " + str(last_score), True, FONT_COLOR)
             scoreRect = score.get_rect()
             scoreRect.center = (SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 50)
             SCREEN.blit(score, scoreRect)
-            f = open("score.txt", "a")
-            f.write(str(points) + "\n")
-            f.close()
+            if points > 0:
+                f = open("score.txt", "a")
+                f.write(str(points) + "\n")
+                f.close()
+                last_score = points
+                points = 0
             with open("score.txt", "r") as f:
                 score = (
                     f.read()
@@ -421,23 +434,42 @@ def menu(death_count):
                 main()
 
 
+if modelo.startswith("gpt"):
+    client = OpenAI()
+elif modelo.startswith("gemini"):
+    print("Listando modelos")
+    genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
+    for m in genai.list_models():
+        if 'generateContent' in m.supported_generation_methods:
+            print(m.name)
+    client = genai.GenerativeModel(modelo)
 
-client = OpenAI()
 
 def generate_answer(messages, model="gpt-3.5-turbo-1106"):
-    try:
-        response = client.chat.completions.create(
-            model=model,
-            messages=[{"role": "user", "content": messages}],
-            temperature=0,
-            seed=42,
-            response_format={"type": "json_object"},
-        )
+    print("Modelo", model)
+    temperatura = 0.0
+    if model.startswith("gpt"):
+        try:
+            response = client.chat.completions.create(
+                model=model,
+                messages=[{"role": "user", "content": messages}],
+                temperature=temperatura,
+                seed=42,
+                response_format={"type": "json_object"},
+            )
 
-        return response.choices[0].message.content
-    except Exception as e:
-        print("Erro", e)
-        return e
+            return response.choices[0].message.content
+        except Exception as e:
+            print("Erro GPT", e)
+            return e
+    elif model.startswith("gemini"):
+        try:
+            genai.GenerationConfig(response_mime_type="application/json", temperature=temperatura)
+            response = client.generate_content(messages)
+            return response.text.lower().replace("```", "").replace("json","")
+        except Exception as e:
+            print("Erro Gemini", e)
+            return e
 
 run_agent = True
 
@@ -452,7 +484,7 @@ def recebe_estados():
             print(60 * "#")
             print("Dados", dados)
             #resposta = generate_answer(jogar)
-            resposta = generate_answer(jogar, model="gpt-4-turbo-preview")
+            resposta = generate_answer(jogar, model=modelo)
             print("Resp", resposta)
             acao["acao"] = json.loads(resposta)["acao"]
             print(acao)
@@ -462,8 +494,8 @@ def recebe_estados():
 
 # inicia o chatgpt
 if inicia_bot:
-    chatgpt_player = threading.Thread(target=recebe_estados)
-    chatgpt_player.start()
+    ai_player = threading.Thread(target=recebe_estados)
+    ai_player.start()
 
 t1 = threading.Thread(target=menu(death_count=0), daemon=True)
 t1.start()
