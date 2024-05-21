@@ -50,6 +50,11 @@ python chromedino_V1_GPT4.py
 
 -   Agradeço demais Dhruv Panchal que fez essa versão para Python porque todas outras versões que encontrei, nenhuma tinha o pássaro. Ou quando tinha, o Dino não abaixava. Sem falar nas nuvens e no cenário que no geral ou não tinha, ou era bugado!
 
+#### Vídeo
+- IA jogando Jogo do DINO
+
+[!["IA JOGANDO JOGO DO DINO"](https://img.youtube.com/vi/moS8rdAbqPM/0.jpg)](https://www.youtube.com/watch?v=moS8rdAbqPM)
+
 ### References:
 -	http://www.pygame.org/docs
 -	https://en.wikipedia.org/wiki/Dinosaur_Game
