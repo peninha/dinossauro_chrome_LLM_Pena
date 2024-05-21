@@ -18,7 +18,8 @@ modelo = "gpt-4o"
 dados = {'inimigo': 'indefinida', 'distancia': "indefinida", 'altura': 'indefinida'}
 acao = {"acao": "nenhuma"}
 jogar = ""
-velocidade_do_jogo = 5
+velocidade_do_jogo = 5  # original = 30
+inicia_bot = True
 
 def atualiza(dados):
     global jogar
@@ -459,8 +460,10 @@ def recebe_estados():
         else:
             time.sleep(1)
 
-t2 = threading.Thread(target=recebe_estados)
-t2.start()
+# inicia o chatgpt
+if inicia_bot:
+    chatgpt_player = threading.Thread(target=recebe_estados)
+    chatgpt_player.start()
 
 t1 = threading.Thread(target=menu(death_count=0), daemon=True)
 t1.start()
