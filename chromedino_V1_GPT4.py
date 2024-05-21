@@ -19,6 +19,7 @@ modelo = "gpt-4o"
 #modelo = "gemini-1.0-pro-latest"
 
 #modelo = "llama3"  # ollama
+modelo = "phi3"  # ollama
 url_ollama = "http://localhost:11434/api/generate"  # endereco do ollama
 
 dados = {'inimigo': 'indefinida', 'distancia': "indefinida", 'altura': 'indefinida'}
@@ -156,7 +157,7 @@ class Dinosaur:
             self.dino_duck = False
             self.dino_run = True
             self.dino_jump = False
-        acao["acao"] = "nenhuma"
+        #acao["acao"] = "nenhuma"
 
     def duck(self):
         self.image = self.duck_img[self.step_index // 5]
@@ -491,10 +492,10 @@ def generate_answer(messages, model="gpt-3.5-turbo-1106"):
         except Exception as e:
             print("Erro Gemini", e)
             return e
-    elif model.startswith("llama"):
+    elif model.startswith("llama") or model.startswith("phi") or model.startswith("gemma"):
         try:
             payload = {
-                "model": "llama3",
+                "model": model,
                 "prompt": messages,
                 "stream": False,
                 "format": "json",
