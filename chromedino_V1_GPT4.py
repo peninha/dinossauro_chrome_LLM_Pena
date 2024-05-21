@@ -12,11 +12,13 @@ import pygame
 from openai import OpenAI
 
 #modelo = "gpt-3.5-turbo-0125"
-modelo = "gpt-4-1106-preview"
+#modelo = "gpt-4-1106-preview"
+modelo = "gpt-4o"
 
 dados = {'inimigo': 'indefinida', 'distancia': "indefinida", 'altura': 'indefinida'}
 acao = {"acao": "nenhuma"}
 jogar = ""
+velocidade_do_jogo = 5
 
 def atualiza(dados):
     global jogar
@@ -238,7 +240,7 @@ class Bird(Obstacle):
 
 
 def main():
-    global game_speed, x_pos_bg, y_pos_bg, points, obstacles, dados, acao
+    global game_speed, x_pos_bg, y_pos_bg, points, obstacles, dados, acao, velocidade_do_jogo
     run = True
     clock = pygame.time.Clock()
     player = Dinosaur()
@@ -358,7 +360,7 @@ def main():
 
         score()
 
-        clock.tick(5)
+        clock.tick(velocidade_do_jogo)
         pygame.display.update()
 
 
