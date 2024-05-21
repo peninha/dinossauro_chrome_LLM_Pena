@@ -258,6 +258,19 @@ def main():
     death_count = 0
     pause = False
 
+    file_path = "score.txt"
+
+    # Check if the file exists, and create it with default text if it doesn't
+    if not os.path.exists(file_path):
+        with open(file_path, 'w') as file:
+            file.write('0')
+    else:
+        # If the file exists but is empty, write "0" to it
+        with open(file_path, 'r+') as file:
+            content = file.read().strip()
+            if content == '':
+                file.write('0')
+
     def score():
         global points, game_speed
         points += 1
@@ -265,7 +278,7 @@ def main():
             game_speed += 1
         current_time = datetime.datetime.now().hour
 
-        file_path = "score.txt"
+        #file_path = "score.txt"
         if not os.path.isfile(file_path):
             # If the file does not exist, create it with some initial content
             with open(file_path, "w") as f:
