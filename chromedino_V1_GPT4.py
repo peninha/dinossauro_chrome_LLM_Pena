@@ -11,11 +11,15 @@ load_dotenv()
 import pygame
 from openai import OpenAI
 import google.generativeai as genai
+import requests
 
 #modelo = "gpt-3.5-turbo-0125"
 #modelo = "gpt-4-1106-preview"
 modelo = "gpt-4o"
 #modelo = "gemini-1.0-pro-latest"
+
+#modelo = "llama3"  # ollama
+url_ollama = "http://localhost:11434/api/generate"  # endereco do ollama
 
 dados = {'inimigo': 'indefinida', 'distancia': "indefinida", 'altura': 'indefinida'}
 acao = {"acao": "nenhuma"}
@@ -127,6 +131,8 @@ class Dinosaur:
     def update(self, userInput):
         global acao
         agir = acao["acao"]
+
+        # atualiza imagem
         if self.dino_duck:
             self.duck()
         if self.dino_run:
@@ -137,6 +143,7 @@ class Dinosaur:
         if self.step_index >= 10:
             self.step_index = 0
 
+        # executa comando
         if (userInput[pygame.K_UP] or userInput[pygame.K_SPACE] or agir == "pular") and not self.dino_jump:
             self.dino_duck = False
             self.dino_run = False
@@ -149,6 +156,7 @@ class Dinosaur:
             self.dino_duck = False
             self.dino_run = True
             self.dino_jump = False
+        acao["acao"] = "nenhuma"
 
     def duck(self):
         self.image = self.duck_img[self.step_index // 5]
@@ -482,6 +490,22 @@ def generate_answer(messages, model="gpt-3.5-turbo-1106"):
             return response.text.lower().replace("```", "").replace("json","")
         except Exception as e:
             print("Erro Gemini", e)
+            return e
+    elif model.startswith("llama"):
+        try:
+            payload = {
+                "model": "llama3",
+                "prompt": messages,
+                "stream": False,
+                "format": "json",
+                "temperature": temperatura
+            }
+
+            response = requests.post(url_ollama, json=payload)
+
+            return response.json()["response"].lower().replace("â", "a").replace("ç", "c").replace("ã", "a").replace("\n", "")
+        except Exception as e:
+            print("Erro Ollama", e)
             return e
 
 run_agent = True
