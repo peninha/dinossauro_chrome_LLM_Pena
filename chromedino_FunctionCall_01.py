@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 import sys
 import datetime
-import json
 import os
 import random
 import threading
@@ -11,9 +10,6 @@ from dotenv import load_dotenv
 load_dotenv()
 import pygame
 from openai import OpenAI
-import google.generativeai as genai
-import requests
-import anthropic
 
 #modelo = "gpt-3.5-turbo-0125"
 modelo = "gpt-4o"
@@ -28,19 +24,45 @@ url_ollama = "http://localhost:11434/api/generate"  # endereco do ollama
 #modelo = "claude-3-sonnet-20240229"
 # modelo = "claude-3-opus-20240229"
 
-dados = {'inimigo': 'indefinida', 'distancia': "indefinida", 'altura': 'indefinida'}
+dados = {'inimigo': 'indefinido', 'distancia': "indefinida", 'altura': 'indefinida'}
 acao = {"acao": "nenhuma"}
 jogar = ""
 velocidade_do_jogo = 5  # original = 30
 inicia_bot = True
+temperatura = 0.0
+tools = [
+    {
+        "type": "function",
+        "function": {
+            "name": "chooseAction",
+            "description": "decides which action to take",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "enemy": {
+                        "type": "string",
+                        "description": "the enemy name"
+                    },
+                    "distance": {
+                        "type": "integer",
+                        "description": "the enemy distance"
+                    },
+                    "height": {
+                        "type": "integer",
+                        "description": "the enemy height"
+                    }
+                },
+                "required": ["enemy", "distance", "height"]
+            }
+        }
+    }
+]
+tool_choice = {"type": "function", "function": {"name": "chooseAction"}}
 
 def atualiza(dados):
     global sys_prompt
     global jogar
-    sys_prompt = """You always must return your answers in a JSON format: 'acao':response
-    If enemy is 'bird' and height > 119, say 'abaixar',
-    Else If distance plus height/2 is less than 460, say 'pular'.
-    Else say 'abaixar'"""
+    sys_prompt = """relay the parameters"""
     jogar = f"""enemy = {dados['inimigo']}
                 distance = {dados['distancia']}
                 height = {dados['altura']}"""
@@ -50,13 +72,14 @@ def atualiza(dados):
         ]
     return messages
 
-def pularCalc(distancia, altura):
-    if isinstance(distancia, int) and isinstance(altura, int):
-        return distancia + altura / 2
-    return "-"
-
 def chooseAction(enemy, distance, height):
-    
+    if enemy == 'indefinido':
+        return False
+    if enemy == 'bird' and height > 119:
+        return 'abaixar'
+    elif (distance + height/2) < 510 and (distance + height/2) > 200:
+        return 'pular'
+    return 'abaixar'
 
 pygame.init()
 
@@ -413,7 +436,7 @@ def menu(death_count):
         if death_count == 0:
             text = font.render("Press any Key to Start", True, FONT_COLOR)
         elif death_count > 0:
-            dados = {'inimigo': 'indefinida', 'distancia': "indefinida", 'altura': 'indefinida'}
+            dados = {'inimigo': 'indefinido', 'distancia': "indefinida", 'altura': 'indefinida'}
             text = font.render("Press any Key to Restart", True, FONT_COLOR)
             score = font.render("Your Score: " + str(last_score), True, FONT_COLOR)
             scoreRect = score.get_rect()
@@ -452,76 +475,22 @@ def menu(death_count):
             if event.type == pygame.KEYDOWN:
                 main()
 
-
 if modelo.startswith("gpt"):
     client = OpenAI()
-elif modelo.startswith("gemini"):
-    print("Listando modelos")
-    genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
-    for m in genai.list_models():
-        if 'generateContent' in m.supported_generation_methods:
-            print(m.name)
-    client = genai.GenerativeModel(modelo)
-elif modelo.startswith("claude"):
-    client = anthropic.Anthropic(
-        api_key=os.environ.get("ANTHROPIC_API_KEY"),
-    )
 
 def generate_answer(messages, model="gpt-3.5-turbo-1106"):
-    temperatura = 0.0
     if model.startswith("gpt"):
         try:
             response = client.chat.completions.create(
                 model=model,
                 messages=messages,
                 temperature=temperatura,
-                seed=42,
-                response_format={"type": "json_object"},
+                tools=tools,
+                tool_choice=tool_choice,
             )
-
-            return response.choices[0].message.content
+            return response.choices[0].message
         except Exception as e:
             print("Erro GPT", e)
-            return e
-    elif model.startswith("gemini"):
-        try:
-            genai.GenerationConfig(response_mime_type="application/json", temperature=temperatura)
-            response = client.generate_content(messages)
-            return response.text.lower().replace("```", "").replace("json","")
-        except Exception as e:
-            print("Erro Gemini", e)
-            return e
-    elif model.startswith("claude"):
-        try:
-            msg = client.messages.create(
-
-                model=model,
-                max_tokens=1000,
-                temperature=temperatura,
-                #system="Você é um assistente divertido.",
-                messages=[
-                    {"role": "user", "content": messages}
-                ]
-            )
-            return msg.content[0].dict()['text']
-        except Exception as e:
-            print("Erro Gemini", e)
-            return e
-    elif model.startswith("llama") or model.startswith("phi") or model.startswith("gemma"):
-        try:
-            payload = {
-                "model": model,
-                "prompt": messages,
-                "stream": False,
-                "format": "json",
-                "temperature": temperatura
-            }
-
-            response = requests.post(url_ollama, json=payload)
-
-            return response.json()["response"].lower().replace("â", "a").replace("ç", "c").replace("ã", "a").replace("\n", "")
-        except Exception as e:
-            print("Erro Ollama", e)
             return e
 
 run_agent = True
@@ -532,25 +501,21 @@ def recebe_estados():
     previousAction = ""
     while run_agent:
         messages = atualiza(dados)
-
-        if not dados["inimigo"] == "indefinida":
-            print(100 * "#")
+        if not dados["inimigo"] == "indefinido":
+            print(60 * "#")
             print("delaytime", clock.tick())
-            distanciaAntes = pularCalc(dados['distancia'], dados['altura'])
             #print("Dados", dados)
-            #resposta = generate_answer(jogar)
+            print("distancia", dados['distancia'])
             resposta = generate_answer(messages, model=modelo)
-            distanciaDepois = pularCalc(dados['distancia'], dados['altura'])
-            print(f"{distanciaAntes} {distanciaDepois}")
-            #print("Resp", resposta)
-            #print(dados['distancia'])
-            #acao["acao"] = json.loads(resposta)["acao"]
+            tool_calls = resposta.tool_calls
+            enemy = eval(tool_calls[0].function.arguments)['enemy']
+            distance = eval(tool_calls[0].function.arguments)['distance']
+            height = eval(tool_calls[0].function.arguments)['height']       
+            acao["acao"] = chooseAction(enemy, distance, height)
             currentAction = acao['acao']
-            #print(f"currentAction: {currentAction}, previousAction: {previousAction}")
             if currentAction != previousAction:
-                print(f"acao = {currentAction} : {distanciaAntes} {distanciaDepois}")
+                print(f"acao = {currentAction} : {dados['altura']}")
             previousAction = currentAction
-            #print(acao['acao'])
             time.sleep(0.2)
         else:
             time.sleep(1)

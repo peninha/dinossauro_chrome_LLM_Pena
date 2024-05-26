@@ -28,7 +28,7 @@ url_ollama = "http://localhost:11434/api/generate"  # endereco do ollama
 #modelo = "claude-3-sonnet-20240229"
 # modelo = "claude-3-opus-20240229"
 
-dados = {'inimigo': 'indefinida', 'distancia': "indefinida", 'altura': 'indefinida'}
+dados = {'inimigo': 'indefinido', 'distancia': "indefinida", 'altura': 'indefinida'}
 acao = {"acao": "nenhuma"}
 jogar = ""
 velocidade_do_jogo = 5  # original = 30
@@ -39,7 +39,7 @@ def atualiza(dados):
     global jogar
     sys_prompt = """You always must return your answers in a JSON format: 'acao':response
     If enemy is 'bird' and height > 119, say 'abaixar',
-    Else If distance plus height/2 is less than 460, say 'pular'.
+    Else If distance plus height/2 is less than 510 and more than 200, say 'pular'.
     Else say 'abaixar'"""
     jogar = f"""enemy = {dados['inimigo']}
                 distance = {dados['distancia']}
@@ -49,11 +49,6 @@ def atualiza(dados):
         {"role": "user", "content": jogar}  # User prompt
         ]
     return messages
-
-def pularCalc(distancia, altura):
-    if isinstance(distancia, int) and isinstance(altura, int):
-        return distancia + altura / 2
-    return "-"
 
 pygame.init()
 
@@ -410,7 +405,7 @@ def menu(death_count):
         if death_count == 0:
             text = font.render("Press any Key to Start", True, FONT_COLOR)
         elif death_count > 0:
-            dados = {'inimigo': 'indefinida', 'distancia': "indefinida", 'altura': 'indefinida'}
+            dados = {'inimigo': 'indefinido', 'distancia': "indefinida", 'altura': 'indefinida'}
             text = font.render("Press any Key to Restart", True, FONT_COLOR)
             score = font.render("Your Score: " + str(last_score), True, FONT_COLOR)
             scoreRect = score.get_rect()
@@ -529,25 +524,17 @@ def recebe_estados():
     previousAction = ""
     while run_agent:
         messages = atualiza(dados)
-
-        if not dados["inimigo"] == "indefinida":
-            print(100 * "#")
+        if not dados["inimigo"] == "indefinido":
+            print(60 * "#")
             print("delaytime", clock.tick())
-            distanciaAntes = pularCalc(dados['distancia'], dados['altura'])
             #print("Dados", dados)
-            #resposta = generate_answer(jogar)
+            print("distancia", dados['distancia'])
             resposta = generate_answer(messages, model=modelo)
-            distanciaDepois = pularCalc(dados['distancia'], dados['altura'])
-            print(f"{distanciaAntes} {distanciaDepois}")
-            #print("Resp", resposta)
-            #print(dados['distancia'])
             acao["acao"] = json.loads(resposta)["acao"]
             currentAction = acao['acao']
-            #print(f"currentAction: {currentAction}, previousAction: {previousAction}")
             if currentAction != previousAction:
-                print(f"acao = {currentAction} : {distanciaAntes} {distanciaDepois}")
+                print(f"acao = {currentAction} : {dados['altura']}")
             previousAction = currentAction
-            #print(acao['acao'])
             time.sleep(0.2)
         else:
             time.sleep(1)
