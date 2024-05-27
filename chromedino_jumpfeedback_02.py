@@ -53,18 +53,19 @@ def getDinoState():
             return "abaixado"
         if dados['dino_cabeca_y'] > 95:
             return "pulando"
-        return "correndo"
+        return "de pé"
     return "-"
 
 sys_prompt = """Você está jogando o jogo do Dino e quer vencer.
 Você recebe as informações do seu dino e do próximo inimigo, e deve decidir pular, abaixar ou nenhuma.
 Mande sua ação em JSON como acao:'sua acao'.
-Note que cabeça e pé indicam a posição no eixo y (altura). Distância indica sempre a distância para o inimigo. Use essas infos e a largura do inimigo para melhor avaliar o momento ideal de pular, quando necessário.
-Como sua primeira ação abaixe, para ver a altura da cabeça do dino. Nem todo bird você consegue abaixar."""
+Note que cabeça e pé indicam a altura da cabeça e do pé. Distância indica sempre a distância horizontal para o inimigo. Use todas essas infos para avaliar o momento ideal de pular e abaixar.
+Como sua primeira ação abaixe, para descobrir a altura da cabeça do dino quando abaixado. Isso é importante para decidir se dá para passar por baixo de um bird.
+Note que você deve repetir a ação 'abaixar' para continuar abaixado. A ação 'nenhuma' volta o dino para o estado 'de pé'."""
 messages = [{"role": "system", "content": sys_prompt}]# System prompt
 
 def atualiza(dados):
-    global sys_prompt, messages, distancia_anterior, distancia_atual, mortes_atual, mortes_anterior
+    global sys_prompt, messages, distancia_anterior, distancia_atual, mortes_atual, mortes_anterior, modelo
     
     dino_state = getDinoState()
     
@@ -76,8 +77,15 @@ def atualiza(dados):
     
     if mortes_atual > mortes_anterior:
         if mortes_atual > 0:
-            user_prompt += "Você MORREU ao colidir com o inimigo. Avalie o resultado da sua ação para que não morra da próxima vez, boa sorte.\n"
-        user_prompt += "NOVO JOGO, valendo...\n"
+            #user_prompt += "Você MORREU ao colidir com o inimigo. Avalie o resultado da sua ação para que não morra da próxima vez, boa sorte.\n"
+            user_prompt += "Você MORREU ao colidir com o inimigo. Analise o resultado e me conte por que vc morreu, e me diga o que deve fazer da próxima vez para não morrer. Responda em JSON acao:'explicar' e explicacao:'explicacao'.\n"
+            messages.append({"role": "user", "content": user_prompt})
+            resposta = generate_answer(messages, model=modelo)
+            print("A")
+            print(resposta)
+            acao["explicacao"] = json.loads(resposta)["explicacao"]
+            messages.append({"role": "assistant", "content": acao["explicacao"]})
+        user_prompt = "NOVO JOGO, valendo...\n"
     mortes_atual = mortes_anterior
     
     user_prompt += f"dino_estado: {dino_state}, "
@@ -396,12 +404,14 @@ def main():
         player.update(userInput)
 
         if len(obstacles) == 0:
+            """
             if random.randint(0, 2) == 0:
                 obstacles.append(SmallCactus(SMALL_CACTUS))
             elif random.randint(0, 2) == 1:
                 obstacles.append(LargeCactus(LARGE_CACTUS))
             elif random.randint(0, 2) == 2:
-                obstacles.append(Bird(BIRD))
+                obstacles.append(Bird(BIRD))"""
+            obstacles.append(Bird(BIRD))
 
         jogar = 2
         for obstacle in obstacles:
@@ -530,7 +540,6 @@ def generate_answer(messages, model="gpt-3.5-turbo-1106"):
                 model=model,
                 messages=messages,
                 temperature=temperatura,
-                seed=42,
                 response_format={"type": "json_object"},
             )
 
@@ -593,6 +602,8 @@ def recebe_estados():
             #print("Dados", dados)
             #print("distancia", dados['distancia'])
             resposta = generate_answer(messages, model=modelo)
+            print("B")
+            print(resposta)
             acao["acao"] = json.loads(resposta)["acao"]
             messages.append({"role": "assistant", "content": acao["acao"]})
             print(messages)
