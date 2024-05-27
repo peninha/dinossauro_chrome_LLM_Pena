@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 import sys
 import datetime
+import json
 import os
 import random
 import threading
@@ -10,9 +11,12 @@ from dotenv import load_dotenv
 load_dotenv()
 import pygame
 from openai import OpenAI
+import google.generativeai as genai
+import requests
+import anthropic
 
-modelo = "gpt-3.5-turbo-0125"
-#modelo = "gpt-4o"
+#modelo = "gpt-3.5-turbo-0125"
+modelo = "gpt-4o"
 
 #modelo = "gemini-1.0-pro-latest"
 
@@ -24,62 +28,72 @@ url_ollama = "http://localhost:11434/api/generate"  # endereco do ollama
 #modelo = "claude-3-sonnet-20240229"
 # modelo = "claude-3-opus-20240229"
 
-dados = {'inimigo': 'indefinido', 'distancia': "indefinida", 'altura': 'indefinida'}
-acao = {"acao": "nenhuma"}
-jogar = ""
-velocidade_do_jogo = 5  # original = 30
-inicia_bot = True
-temperatura = 0.0
-tools = [
-    {
-        "type": "function",
-        "function": {
-            "name": "chooseAction",
-            "description": "decides which action to take",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "enemy": {
-                        "type": "string",
-                        "description": "the enemy name"
-                    },
-                    "distance": {
-                        "type": "integer",
-                        "description": "the enemy distance"
-                    },
-                    "height": {
-                        "type": "integer",
-                        "description": "the enemy height"
-                    }
-                },
-                "required": ["enemy", "distance", "height"]
-            }
-        }
+dados = {
+    'dino_pe_y': 'indefinido',
+    'dino_cabeca_y': 'indefinido',
+    'inimigo': 'indefinido',
+    'inimigo_distancia': "indefinido",
+    'inimigo_largura': "indefinido",
+    'inimigo_pe_y': 'indefinido',
+    'inimigo_cabeca_y': 'indefinido',
     }
-]
-tool_choice = {"type": "function", "function": {"name": "chooseAction"}}
+distancia_anterior = 0;
+distancia_atual = 0;
+acao = {"acao": "nenhuma"}
+velocidade_do_jogo = 3  # original = 30
+inicia_bot = True
+mortes_anterior = -1
+mortes_atual = 0
+MAX_MESSAGES = 60
+
+def getDinoState():
+    if isinstance(dados['dino_cabeca_y'], int):
+        if dados['dino_cabeca_y'] < 90:
+            return "abaixado"
+        if dados['dino_cabeca_y'] > 95:
+            return "pulando"
+        return "correndo"
+    return "-"
+
+sys_prompt = """Você está jogando o jogo do Dino e quer vencer.
+Você recebe as informações do seu dino e do próximo inimigo, e deve decidir pular, abaixar ou nenhuma.
+Mande sua ação em JSON como acao:'sua acao'.
+Note que cabeça e pé indicam a posição no eixo y (altura). Distância indica sempre a distância para o inimigo. Use essas infos e a largura do inimigo para melhor avaliar o momento ideal de pular, quando necessário.
+Como sua primeira ação abaixe, para ver a altura da cabeça do dino. Nem todo bird você consegue abaixar."""
+messages = [{"role": "system", "content": sys_prompt}]# System prompt
 
 def atualiza(dados):
-    global sys_prompt
-    global jogar
-    sys_prompt = """relay the parameters"""
-    jogar = f"""enemy = {dados['inimigo']}
-                distance = {dados['distancia']}
-                height = {dados['altura']}"""
-    messages = [
-        {"role": "system", "content": sys_prompt},  # System prompt
-        {"role": "user", "content": jogar}  # User prompt
-        ]
-    return messages
-
-def chooseAction(enemy, distance, height):
-    if enemy == 'indefinido':
+    global sys_prompt, messages, distancia_anterior, distancia_atual, mortes_atual, mortes_anterior
+    
+    dino_state = getDinoState()
+    
+    if dino_state == "-":
         return False
-    if enemy == 'bird' and height > 119:
-        return 'abaixar'
-    elif (distance + height/2) < 510 and (distance + height/2) > 200:
-        return 'pular'
-    return 'abaixar'
+    distancia_atual = dados['inimigo_distancia']
+    
+    user_prompt = ""
+    
+    if mortes_atual > mortes_anterior:
+        if mortes_atual > 0:
+            user_prompt += "Você MORREU ao colidir com o inimigo. Avalie o resultado da sua ação para que não morra da próxima vez, boa sorte.\n"
+        user_prompt += "NOVO JOGO, valendo...\n"
+    mortes_atual = mortes_anterior
+    
+    user_prompt += f"dino_estado: {dino_state}, "
+    user_prompt += f"dino_cabeça = {dados['dino_cabeca_y']}, "
+    user_prompt += f"dino_pé = {dados['dino_pe_y']}\n"
+    if distancia_atual > distancia_anterior:
+        user_prompt += f"inimigo: {dados['inimigo']}, "
+        user_prompt += f"inimigo_largura = {dados['inimigo_largura']}, "
+        user_prompt += f"inimigo_cabeça = {dados['inimigo_cabeca_y']}, "
+        user_prompt += f"inimigo_pé = {dados['inimigo_pe_y']},\n"
+    user_prompt += f"distancia = {dados['inimigo_distancia']}"
+    messages.append({"role": "user", "content": user_prompt})
+    if len(messages) > MAX_MESSAGES:
+       messages = messages[:1] + messages[-1*MAX_MESSAGES+1:]
+    
+    distancia_anterior = distancia_atual
+    return True
 
 pygame.init()
 
@@ -391,7 +405,15 @@ def main():
         jogar = 2
         for obstacle in obstacles:
             if frames == jogar:
-                dados = {"inimigo": obstacle.name, "distancia": obstacle.rect[0], "altura": (SCREEN_HEIGHT - obstacle.rect[1]) - (SCREEN_HEIGHT - (310 + 94))}
+                dados = {
+        "dino_pe_y": 404 - player.dino_rect.bottom,
+        "dino_cabeca_y": 404 - player.dino_rect.top,
+        "inimigo": obstacle.name,
+        "inimigo_distancia": obstacle.rect.centerx - player.dino_rect.centerx,
+        "inimigo_largura": obstacle.rect.width + player.dino_rect.width, #somo a largura do dino para tratar o dino como não tendo largura
+        "inimigo_pe_y": 404 - obstacle.rect.bottom,
+        "inimigo_cabeca_y": 404 - obstacle.rect.top,
+                }
             obstacle.draw(SCREEN)
             obstacle.update()
             if player.dino_rect.colliderect(obstacle.rect):
@@ -418,7 +440,7 @@ def main():
 def menu(death_count):
     global points
     global FONT_COLOR
-    global run_agent, dados
+    global run_agent, dados, mortes_atual
 
     last_score = 0
 
@@ -436,7 +458,16 @@ def menu(death_count):
         if death_count == 0:
             text = font.render("Press any Key to Start", True, FONT_COLOR)
         elif death_count > 0:
-            dados = {'inimigo': 'indefinido', 'distancia': "indefinida", 'altura': 'indefinida'}
+            mortes_atual += 1
+            dados = {
+                'dino_pe_y': 'indefinido',
+                'dino_cabeca_y': 'indefinido',
+                'inimigo': 'indefinido',
+                'inimigo_distancia': "indefinido",
+                'inimigo_largura': "indefinido",
+                'inimigo_pe_y': 'indefinido',
+                'inimigo_cabeca_y': 'indefinido',
+            }
             text = font.render("Press any Key to Restart", True, FONT_COLOR)
             score = font.render("Your Score: " + str(last_score), True, FONT_COLOR)
             scoreRect = score.get_rect()
@@ -475,47 +506,100 @@ def menu(death_count):
             if event.type == pygame.KEYDOWN:
                 main()
 
+
 if modelo.startswith("gpt"):
     client = OpenAI()
+elif modelo.startswith("gemini"):
+    print("Listando modelos")
+    genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
+    for m in genai.list_models():
+        if 'generateContent' in m.supported_generation_methods:
+            print(m.name)
+    client = genai.GenerativeModel(modelo)
+elif modelo.startswith("claude"):
+    client = anthropic.Anthropic(
+        api_key=os.environ.get("ANTHROPIC_API_KEY"),
+    )
 
 def generate_answer(messages, model="gpt-3.5-turbo-1106"):
+    temperatura = 0.0
     if model.startswith("gpt"):
         try:
             response = client.chat.completions.create(
                 model=model,
                 messages=messages,
                 temperature=temperatura,
-                tools=tools,
-                tool_choice=tool_choice,
+                seed=42,
+                response_format={"type": "json_object"},
             )
-            return response.choices[0].message
+
+            return response.choices[0].message.content
         except Exception as e:
             print("Erro GPT", e)
+            return e
+    elif model.startswith("gemini"):
+        try:
+            genai.GenerationConfig(response_mime_type="application/json", temperature=temperatura)
+            response = client.generate_content(messages)
+            return response.text.lower().replace("```", "").replace("json","")
+        except Exception as e:
+            print("Erro Gemini", e)
+            return e
+    elif model.startswith("claude"):
+        try:
+            msg = client.messages.create(
+
+                model=model,
+                max_tokens=1000,
+                temperature=temperatura,
+                #system="Você é um assistente divertido.",
+                messages=[
+                    {"role": "user", "content": messages}
+                ]
+            )
+            return msg.content[0].dict()['text']
+        except Exception as e:
+            print("Erro Gemini", e)
+            return e
+    elif model.startswith("llama") or model.startswith("phi") or model.startswith("gemma"):
+        try:
+            payload = {
+                "model": model,
+                "prompt": messages,
+                "stream": False,
+                "format": "json",
+                "temperature": temperatura
+            }
+
+            response = requests.post(url_ollama, json=payload)
+
+            return response.json()["response"].lower().replace("â", "a").replace("ç", "c").replace("ã", "a").replace("\n", "")
+        except Exception as e:
+            print("Erro Ollama", e)
             return e
 
 run_agent = True
 
 def recebe_estados():
-    global run_agent, dados, acao, jogar, sys_prompt
+    global run_agent, dados, acao, sys_prompt, messages
     clock = pygame.time.Clock()
     previousAction = ""
     while run_agent:
-        messages = atualiza(dados)
+        atualiza(dados)
         if not dados["inimigo"] == "indefinido":
-            print(60 * "#")
+            print(10 * "#")
             print("delaytime", clock.tick())
             #print("Dados", dados)
-            print("distancia", dados['distancia'])
+            #print("distancia", dados['distancia'])
             resposta = generate_answer(messages, model=modelo)
-            tool_calls = resposta.tool_calls
-            enemy = eval(tool_calls[0].function.arguments)['enemy']
-            distance = eval(tool_calls[0].function.arguments)['distance']
-            height = eval(tool_calls[0].function.arguments)['height']       
-            acao["acao"] = chooseAction(enemy, distance, height)
-            currentAction = acao['acao']
-            if currentAction != previousAction:
-                print(f"acao = {currentAction} : {dados['altura']}")
-            previousAction = currentAction
+            acao["acao"] = json.loads(resposta)["acao"]
+            messages.append({"role": "assistant", "content": acao["acao"]})
+            print(messages)
+            #print(acao["acao"])
+            #currentAction = acao['acao']
+            #if currentAction != previousAction:
+            #    print(f"acao = {currentAction}")
+            #previousAction = currentAction
             time.sleep(0.2)
         else:
             time.sleep(1)
