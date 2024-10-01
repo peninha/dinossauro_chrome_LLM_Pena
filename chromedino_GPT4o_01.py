@@ -16,7 +16,7 @@ import requests
 import anthropic
 
 #modelo = "gpt-3.5-turbo-0125"
-modelo = "gpt-4o"
+modelo = "gpt-4o-mini"
 
 #modelo = "gemini-1.0-pro-latest"
 
